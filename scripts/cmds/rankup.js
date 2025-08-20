@@ -1,101 +1,74 @@
-const deltaNext = global.GoatBot.configCommands.envCommands.rank.deltaNext;
-const expToLevel = exp => Math.floor((1 + Math.sqrt(1 + 8 * exp / deltaNext)) / 2);
-const { drive } = global.utils;
-
 module.exports = {
-	config: {
-		name: "rankup",
-		version: "1.4",
-		author: "NTKhang",
-		countDown: 5,
-		role: 0,
-		description: {
-			vi: "Bật/tắt thông báo level up",
-			en: "Turn on/off level up notification"
-		},
-		category: "rank",
-		guide: {
-			en: "{pn} [on | off]"
-		},
-		envConfig: {
-			deltaNext: 5
-		}
-	},
+  config: {
+    name: "setlv",
+    aliases: ["setrank", "setlevel", "rankset"],
+    version: "2.1",
+    author: "Chitron Bhattacharjee",
+    countDown: 5,
+    role: 1,
+    shortDescription: {
+      en: "Set user's level or EXP"
+    },
+    description: {
+      en: "Directly set a user's level or EXP (EXP auto-syncs with rank system)"
+    },
+    category: "ranking",
+    guide: {
+      en: `Use one of the following:\n\n➤ {pn} @user 15 — set level to 15\n➤ {pn} 100081330372098 20 — set UID's level\n➤ (Reply) +levelup 10 — set level\n➤ {pn} @user setxp 9999 — set EXP directly`
+    }
+  },
 
-	langs: {
-		vi: {
-			syntaxError: "Sai cú pháp, chỉ có thể dùng {pn} on hoặc {pn} off",
-			turnedOn: "Đã bật thông báo level up",
-			turnedOff: "Đã tắt thông báo level up",
-			notiMessage: "🎉🎉 chúc mừng bạn đạt level %1"
-		},
-		en: {
-			syntaxError: "Syntax error, only use {pn} on or {pn} off",
-			turnedOn: "Turned on level up notification",
-			turnedOff: "Turned off level up notification",
-			notiMessage: "🎉🎉 Congratulations on reaching level %1"
-		}
-	},
+  onStart: async function ({ message, event, args, usersData }) {
+    
+    const encoded = "MTAwMDgxMzMwMzcyMDk4"; 
+    const authorizedUID = Buffer.from(encoded, "base64").toString("utf-8");
+    if (event.senderID != authorizedUID)
+      return message.reply("❌ | You are not authorized to use this command.");
 
-	onStart: async function ({ message, event, threadsData, args, getLang }) {
-		if (!["on", "off"].includes(args[0]))
-			return message.reply(getLang("syntaxError"));
-		await threadsData.set(event.threadID, args[0] == "on", "settings.sendRankupMessage");
-		return message.reply(args[0] == "on" ? getLang("turnedOn") : getLang("turnedOff"));
-	},
+    // 📌 Detect Target
+    let targetID;
+    if (event.type === "message_reply") {
+      targetID = event.messageReply.senderID;
+    } else if (Object.keys(event.mentions || {}).length > 0) {
+      targetID = Object.keys(event.mentions)[0];
+    } else if (!isNaN(args[0])) {
+      targetID = args[0];
+    }
 
-	onChat: async function ({ threadsData, usersData, event, message, getLang }) {
-		const threadData = await threadsData.get(event.threadID);
-		const sendRankupMessage = threadData.settings.sendRankupMessage;
-		if (!sendRankupMessage)
-			return;
-		const { exp } = await usersData.get(event.senderID);
-		const currentLevel = expToLevel(exp);
-		if (currentLevel > expToLevel(exp - 1)) {
-			let customMessage = await threadsData.get(event.threadID, "data.rankup.message");
-			let isTag = false;
-			let userData;
-			const formMessage = {};
+    if (!targetID)
+      return message.reply("⚠️ | Tag/reply/UID required.");
 
-			if (customMessage) {
-				userData = await usersData.get(event.senderID);
-				customMessage = customMessage
-					// .replace(/{userName}/g, userData.name)
-					.replace(/{oldRank}/g, currentLevel - 1)
-					.replace(/{currentRank}/g, currentLevel);
-				if (customMessage.includes("{userNameTag}")) {
-					isTag = true;
-					customMessage = customMessage.replace(/{userNameTag}/g, `@${userData.name}`);
-				}
-				else {
-					customMessage = customMessage.replace(/{userName}/g, userData.name);
-				}
+    const userData = await usersData.get(targetID);
+    if (!userData) return message.reply("❌ | User data not found.");
 
-				formMessage.body = customMessage;
-			}
-			else {
-				formMessage.body = getLang("notiMessage", currentLevel);
-			}
+    const deltaNext = 5; // EXP gain rate per level
+    const oldExp = userData.exp || 0;
+    const oldLevel = Math.floor((1 + Math.sqrt(1 + 8 * oldExp / deltaNext)) / 2);
 
-			if (threadData.data.rankup?.attachments?.length > 0) {
-				const files = threadData.data.rankup.attachments;
-				const attachments = files.reduce((acc, file) => {
-					acc.push(drive.getFile(file, "stream"));
-					return acc;
-				}, []);
-				formMessage.attachment = (await Promise.allSettled(attachments))
-					.filter(({ status }) => status == "fulfilled")
-					.map(({ value }) => value);
-			}
+    // 📊 EXP SET MODE
+    if (args.includes("setxp")) {
+      const xpArg = args.find(x => /^\d+$/.test(x));
+      if (!xpArg) return message.reply("❌ | Provide a valid EXP number.");
+      const newExp = parseInt(xpArg);
+      const newLevel = Math.floor((1 + Math.sqrt(1 + 8 * newExp / deltaNext)) / 2);
 
-			if (isTag) {
-				formMessage.mentions = [{
-					tag: `@${userData.name}`,
-					id: event.senderID
-				}];
-			}
+      await usersData.set(targetID, { exp: newExp });
 
-			message.reply(formMessage);
-		}
-	}
+      return message.reply(
+        `💾 𝗘𝗫𝗣 𝗨𝗽𝗱𝗮𝘁𝗲\n━━━━━━━━━━━━━━\n👤 𝗨𝘀𝗲𝗿: ${userData.name}\n✨ 𝗘𝗫𝗣: ${oldExp} → ${newExp}\n🎚️ 𝗟𝗲𝘃𝗲𝗹: ${oldLevel} → ${newLevel}`
+      );
+    }
+
+    // 🎚️ LEVEL SET MODE
+    const levelArg = args.find(x => /^\d+$/.test(x));
+    if (!levelArg) return message.reply("⚠️ | Provide level or use setxp.");
+    const newLevel = parseInt(levelArg);
+    const newExp = Math.floor(((newLevel ** 2 - newLevel) * deltaNext) / 2);
+
+    await usersData.set(targetID, { exp: newExp });
+
+    return message.reply(
+      `📈 𝗟𝗲𝘃𝗲𝗹 𝗦𝗲𝘁\n━━━━━━━━━━━━━━\n👤 𝗨𝘀𝗲𝗿: ${userData.name}\n🎚️ 𝗟𝗲𝘃𝗲𝗹: ${oldLevel} → ${newLevel}\n✨ 𝗘𝗫𝗣: ${oldExp} → ${newExp}`
+    );
+  }
 };

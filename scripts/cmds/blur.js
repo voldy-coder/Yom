@@ -1,49 +1,57 @@
-module.exports = {
-    config: {
-        name: "blur",
-        version: "2.0",
-        author: "ASIF",
-        countDown: 3,
-        role: 0,
-        description: {
-            en: "𝗕𝗹𝘂𝗿 𝗜𝗺𝗮𝗴𝗲"
-        },
-        category: "𝗜𝗠𝗔𝗚𝗘",
-        guide: {
-            en: "{pn} [ImgReply/imgLink]"
-        }
-    },
+const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
 
-    onStart: async function ({ api, args, message, event }) {
-        try {
-        let [imageUrl, blurLevel] = event.body.slice(event.body.indexOf(' ') + 1).split("|").map((item) => item.trim());
- 
-        if (event.type == "message_reply" && event.messageReply.attachments){
-            imageUrl = event.messageReply.attachments[0].url;
-        }else if (args[0]){
-            imageUrl = args[0]
-        }else {
-            return message.reply("❎ | 𝙿𝚕𝚎𝚊𝚜𝚎 𝚛𝚎𝚙𝚕𝚢 𝚝𝚘 𝚊𝚗 𝚒𝚖𝚊𝚐𝚎.");
-        }
-        if (blurLevel){
-            blurLevel = blurLevel;
-        }else{
-            blurLevel = "5";
-        }
-        if(imageUrl){
-            api.setMessageReaction("⏳", event.messageID, (err) => {}, true);
-            var waitMsg = await message.reply("⏳ |   𝙿𝚕𝚎𝚊𝚜𝚎 𝚠𝚊𝚒𝚝 𝚊 𝚠𝚑𝚒𝚕𝚎...");
-        }    
-        const imgStream = `https://rubish-apihub.onrender.com/rubish//edit-blur?url=${encodeURIComponent(event.messageReply.attachments[0].url)}&blurLevel=${blurLevel}&apikey=rubish69`;
-        api.setMessageReaction("✅", event.messageID, (err) => {}, true);
-        message.unsend(waitMsg.messageID);
-             message.reply({
-                body: "✅ | 𝙷𝚎𝚛𝚎'𝚜 𝚈𝚘𝚞𝚛 𝙱𝚕𝚞𝚛 𝙸𝚖𝚊𝚐𝚎 <😘",
-                attachment: await global.utils.getStreamFromURL(imgStream)
-            });
-      } catch (error) {
-            console.log(error);
-            message.reply(`❎ | 𝙴𝚛𝚛𝚘𝚛: ${error.message}`);
-      }
+module.exports = {
+  config: {
+    name: "blur",
+    version: "1.0",
+    author: "Chitron Bhattacharjee",
+    countDown: 10,
+    role: 0,
+    shortDescription: {
+      en: "Apply blur effect to profile picture"
+    },
+    description: {
+      en: "Adds a blur effect to your or mentioned user's profile picture"
+    },
+    category: "𝗙𝗨𝗡 & 𝗚𝗔𝗠𝗘",
+    guide: {
+      en: "{p}blur [@mention or reply]\nIf no mention or reply, uses your profile picture."
     }
+  },
+
+  onStart: async function ({ api, event, message }) {
+    const { senderID, mentions, type, messageReply } = event;
+
+    // Determine user ID for avatar
+    let uid;
+    if (Object.keys(mentions).length > 0) {
+      uid = Object.keys(mentions)[0];
+    } else if (type === "message_reply") {
+      uid = messageReply.senderID;
+    } else {
+      uid = senderID;
+    }
+
+    const avatarURL = `https://graph.facebook.com/${uid}/picture?width=512&height=512&access_token=350685531728|62f8ce9f74b12f84c123cc23437a4a32`;
+
+    try {
+      const res = await axios.get(`https://api.popcat.xyz/v2/blur?image=${encodeURIComponent(avatarURL)}`, {
+        responseType: "arraybuffer"
+      });
+
+      const filePath = path.join(__dirname, "cache", `blur_${uid}_${Date.now()}.png`);
+      fs.writeFileSync(filePath, res.data);
+
+      message.reply({
+        body: "🌫️ Here's your blurred image!",
+        attachment: fs.createReadStream(filePath)
+      }, () => fs.unlinkSync(filePath));
+
+    } catch (err) {
+      console.error(err);
+      message.reply("❌ | Failed to generate blurred image.");
+    }
+  }
 };

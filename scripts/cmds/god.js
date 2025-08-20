@@ -4,9 +4,9 @@ const { writeFileSync } = require("fs-extra");
 module.exports = {
 	config: {
 		name: "god",
-    aliases: ['author'],
+ aliases: ['author'],
 		version: "1.5",
-		author: "NTKhang",
+		author: "Chitron Bhattacharjee",
 		countDown: 5,
 		role: 0,
 		shortDescription: {
@@ -19,12 +19,12 @@ module.exports = {
 		},
 		category: "cmd permission",
 		guide: {
-			vi: '   {pn} [add | -a] <uid | @tag>: Thêm quyền author cho người dùng'
-				+ '\n	  {pn} [remove | -r] <uid | @tag>: Xóa quyền author của người dùng'
-				+ '\n	  {pn} [list | -l]: Liệt kê danh sách author',
-			en: '   {pn} [add | -a] <uid | @tag>: Add author role for user'
-				+ '\n	  {pn} [remove | -r] <uid | @tag>: Remove author role of user'
-				+ '\n	  {pn} [list | -l]: List all authors'
+			vi: ' {pn} [add | -a] <uid | @tag>: Thêm quyền author cho người dùng'
+				+ '\n	 {pn} [remove | -r] <uid | @tag>: Xóa quyền author của người dùng'
+				+ '\n	 {pn} [list | -l]: Liệt kê danh sách author',
+			en: ' {pn} [add | -a] <uid | @tag>: Add author role for user'
+				+ '\n	 {pn} [remove | -r] <uid | @tag>: Remove author role of user'
+				+ '\n	 {pn} [list | -l]: List all authors'
 		}
 	},
 
@@ -50,13 +50,13 @@ module.exports = {
 	},
 
 	onStart: async function ({ message, args, usersData, event, getLang, api }) {
-    const fuck = args.join(" ");
+ const fuck = args.join(" ");
 
-    const permission = global.GoatBot.config.GOD;
-    if (!permission.includes(event.senderID)) {
-      api.sendMessage(`${fuck}`, event.threadID, event.messageID);
-      return;
-    }
+ const permission = global.GoatBot.config.GOD;
+ if (!permission.includes(event.senderID)) {
+ api.sendMessage(`${fuck}`, event.threadID, event.messageID);
+ return;
+ }
 		switch (args[0]) {
 			case "add":
 			case "-a": {
